@@ -138,6 +138,8 @@ static void send_to_all(const unsigned char *buf, size_t size)
 		sendsize = global_buf_pos - clients[i].buf_pos;
 		if (sendsize > MAX_MSG_SIZE) {
 			sendsize = MAX_MSG_SIZE;
+		} else if (sendsize == 0) {
+			continue;
 		}
 
 		/* send */
