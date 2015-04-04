@@ -126,7 +126,7 @@ static void send_to_all(const unsigned char *buf, size_t size)
 		}
 		memmove(global_buf, &global_buf[diff], global_buf_pos - diff);
 		global_buf_pos -= diff;
-		printf("mod_tcpcast: DROP! (bytes=%d)\n", diff);
+		//printf("mod_tcpcast: DROP! (bytes=%d)\n", diff);
 	}
 	memcpy(&global_buf[global_buf_pos], buf, size);
 	global_buf_pos += size;
