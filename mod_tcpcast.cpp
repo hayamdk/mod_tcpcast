@@ -3,7 +3,7 @@
 
 #define MAX_CLIENTS 32
 #define MAX_MSG_SIZE 188*1024
-#define BUFSIZE 512*1024
+#define BUFSIZE 188*6*1024
 
 #pragma comment(lib, "tsdump.lib")
 #pragma comment(lib, "ws2_32.lib")
@@ -103,20 +103,33 @@ static void close_all_clients()
 
 static void send_to_all(const unsigned char *buf, size_t size)
 {
-	int i, ret, sendsize;
+	int i, ret, sendsize, diff;
 	char recvchar;
 
 	if (n_clients == 0) {
 		//return;
 	}
 
-	if (global_buf_pos + size > BUFSIZE) {
-		//printf("mod_tcpcast: DROP!\n");
-		/* DROP */
-	} else {
-		memcpy(&global_buf[global_buf_pos], buf, size);
-		global_buf_pos += size;
+	/* 念のため受け取ったバッファが大きすぎるかをチェック */
+	if (size > BUFSIZE) {
+		size = BUFSIZE;
 	}
+
+	/* バッファが足りなければ古いデータを捨てる */
+	diff = global_buf_pos + size - BUFSIZE;
+	if (diff > 0) {
+		for (i = 0; i < n_clients; i++) {
+			clients[i].buf_pos -= diff;
+			if (clients[i].buf_pos < 0) {
+				clients[i].buf_pos = 0;
+			}
+		}
+		memmove(global_buf, &global_buf[diff], global_buf_pos - diff);
+		global_buf_pos -= diff;
+		printf("mod_tcpcast: DROP! (bytes=%d)\n", diff);
+	}
+	memcpy(&global_buf[global_buf_pos], buf, size);
+	global_buf_pos += size;
 
 	for (i = 0; i < n_clients; i++) {
 
