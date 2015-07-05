@@ -20,7 +20,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="mod_tcpcast.cpp">
+    <ClCompile Include="mod_tcpcast.c">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>

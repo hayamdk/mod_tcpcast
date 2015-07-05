@@ -81,7 +81,7 @@
     <ClInclude Include="modules_def.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="mod_tcpcast.cpp" />
+    <ClCompile Include="mod_tcpcast.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -13,7 +13,9 @@
 #include <stdio.h>
 #include <sys/timeb.h>
 #include <time.h>
+#include <inttypes.h>
 
+#define IN_SHARED_MODULE
 #include "modules_def.h"
 
 typedef struct{
@@ -37,10 +39,12 @@ int global_buf_pos = 0;
 static int add_client(SOCKET sock, struct in_addr addr, USHORT port)
 {
 	if (n_clients >= MAX_CLIENTS) {
-		fprintf(stderr, "mod_tcpcast: クライアント数が上限に達しているため接続できません(%s:%d)\n", inet_ntoa(addr), ntohs(port));
+		//fprintf(stderr, "mod_tcpcast: クライアント数が上限に達しているため接続できません(%s:%d)\n", inet_ntoa(addr), ntohs(port));
+		output_message(MSG_ERROR, L"クライアント数が上限に達しているため接続できません(%S:%d)", inet_ntoa(addr), ntohs(port));
 		return 0;
 	}
-	fprintf(stdout, "mod_tcpcast: クライアント(%s:%d)が接続されました\n", inet_ntoa(addr), ntohs(port));
+	//fprintf(stdout, "mod_tcpcast: クライアント(%s:%d)が接続されました\n", inet_ntoa(addr), ntohs(port));
+	output_message(MSG_NOTIFY, L"mod_tcpcast: クライアント(%S:%d)が接続されました\n", inet_ntoa(addr), ntohs(port));
 	clients[n_clients].sock = sock;
 	clients[n_clients].addr = addr;
 	clients[n_clients].port = port;
@@ -66,7 +70,9 @@ static void remove_dead_clients()
 	for (i = 0; i < n_clients; ) { /* n_clients に volatile が要りそう？ */
 		if ( ! clients[i].alive ) {
 			remove_client(i);
-			fprintf(stderr, "mod_tcpcast: クライアント(%s:%d)を切断しました\n",
+			//fprintf(stderr, "mod_tcpcast: クライアント(%s:%d)を切断しました\n",
+			//	inet_ntoa(clients[i].addr), ntohs(clients[i].port));
+			output_message(MSG_NOTIFY, L"mod_tcpcast: クライアント(%S:%d)を切断しました\n",
 				inet_ntoa(clients[i].addr), ntohs(clients[i].port));
 		} else {
 			i++;
@@ -137,7 +143,8 @@ static void send_to_all(const unsigned char *buf, size_t size)
 		ret = recv(clients[i].sock, &recvchar, 1, 0);
 		if (ret == SOCKET_ERROR) {
 			if (WSAGetLastError() != WSAEWOULDBLOCK) {
-				print_err(L"recv()", WSAGetLastError());
+				//print_err(L"recv()", WSAGetLastError());
+				output_message(MSG_WINSOCKERROR, L"recv()に失敗しました");
 				clients[i].alive = 0;
 			}
 		} else if(ret > 0) {
@@ -161,7 +168,8 @@ static void send_to_all(const unsigned char *buf, size_t size)
 			if (WSAGetLastError() == WSAEWOULDBLOCK) {
 				//printf("mod_tcpcast: PASS!\n");
 			} else {
-				print_err(L"send()", WSAGetLastError());
+				//print_err(L"send()", WSAGetLastError());
+				output_message(MSG_WINSOCKERROR, L"send()に失敗しました");
 				clients[i].alive = 0;
 				break;
 			}
@@ -180,12 +188,14 @@ static void hook_open_stream()
 	}
 
 	if (WSAStartup(MAKEWORD(2, 0), &wsad) != 0) {
-		print_err(L"WSAStartup()に失敗", WSAGetLastError());
+		//print_err(L"WSAStartup()に失敗", WSAGetLastError());
+		output_message(MSG_WINSOCKERROR, L"WSAStartup()に失敗");
 		return;
 	}
 	sock = socket(AF_INET, SOCK_STREAM, 0);
 	if (sock == INVALID_SOCKET){
-		print_err(L"socketの作成に失敗", WSAGetLastError());
+		//print_err(L"socketの作成に失敗", WSAGetLastError());
+		output_message(MSG_WINSOCKERROR, L"socketの作成に失敗");
 		WSACleanup();
 		return;
 	}
@@ -195,7 +205,8 @@ static void hook_open_stream()
 	addr.sin_addr.S_un.S_addr = INADDR_ANY;
 
 	if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) == SOCKET_ERROR){
-		print_err(L"bind()に失敗", WSAGetLastError());
+		//print_err(L"bind()に失敗", WSAGetLastError());
+		output_message(MSG_WINSOCKERROR, L"bind()に失敗");
 		shutdown(sock, SD_BOTH);
 		closesocket(sock);
 		WSACleanup();
@@ -203,7 +214,8 @@ static void hook_open_stream()
 	}
 
 	if (listen(sock, 5) == SOCKET_ERROR){
-		print_err(L"listen()に失敗", WSAGetLastError());
+		//print_err(L"listen()に失敗", WSAGetLastError());
+		output_message(MSG_WINSOCKERROR, L"listen()に失敗");
 		shutdown(sock, SD_BOTH);
 		closesocket(sock);
 		WSACleanup();
@@ -212,7 +224,8 @@ static void hook_open_stream()
 
 	u_long val = 1;
 	if (ioctlsocket(sock, FIONBIO, &val) != NO_ERROR) {
-		print_err(L"ソケットをノンブロッキングモードに設定できません", WSAGetLastError());
+		//print_err(L"ソケットをノンブロッキングモードに設定できません", WSAGetLastError());
+		output_message(MSG_WINSOCKERROR, L"ソケットをノンブロッキングモードに設定できません(ioctlsocket)");
 		shutdown(sock, SD_BOTH);
 		closesocket(sock);
 		WSACleanup();
@@ -237,7 +250,8 @@ static void hook_stream(const unsigned char* buf, const size_t size, const int e
 		sock_client = accept(sock, (struct sockaddr *)&client_addr, &client_addr_len);
 		if (sock_client == INVALID_SOCKET) {
 			if (WSAGetLastError() != WSAEWOULDBLOCK) {
-				print_err(L"accept()に失敗", WSAGetLastError());
+				//print_err(L"accept()に失敗", WSAGetLastError());
+				output_message(MSG_WINSOCKERROR, L"accept()に失敗");
 			}
 			break;
 		}
@@ -279,12 +293,12 @@ static const WCHAR *set_port(const WCHAR *param)
 }
 
 static cmd_def_t cmds[] = {
-	{ L"-tcpport", L"TCPのポート番号", 1, set_port },
+	{ L"--tcpport", L"TCPのポート番号", 1, set_port },
 	NULL,
 };
 
-MODULE_EXPORT module_def_t mod_tcpcast = {
-	TSDUMP_MODULE_V1,
+MODULE_DEF module_def_t mod_tcpcast = {
+	TSDUMP_MODULE_V2,
 	L"mod_tcpcast",
 	register_hooks,
 	cmds
