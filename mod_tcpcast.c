@@ -16,7 +16,9 @@
 #include <inttypes.h>
 
 #define IN_SHARED_MODULE
-#include "modules_def.h"
+#include "module_def.h"
+#include "ts_proginfo.h"
+#include "module_hooks.h"
 
 typedef struct{
 	struct in_addr addr;
@@ -298,7 +300,7 @@ static cmd_def_t cmds[] = {
 };
 
 MODULE_DEF module_def_t mod_tcpcast = {
-	TSDUMP_MODULE_V2,
+	TSDUMP_MODULE_V3,
 	L"mod_tcpcast",
 	register_hooks,
 	cmds

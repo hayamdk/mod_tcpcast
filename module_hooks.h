@@ -1,78 +1,12 @@
-#define MAX_PATH_LEN		MAX_PATH
-
-#ifdef IN_SHARED_MODULE
-	#ifdef __cplusplus
-		#define MODULE_EXPORT_FUNC		extern "C" __declspec(dllimport)
-		#define MODULE_EXPORT_VAR		extern "C" __declspec(dllimport)
-		#define MODULE_DEF				extern "C" __declspec(dllexport)
-	#else
-		#define MODULE_EXPORT_FUNC		__declspec(dllimport)
-		#define MODULE_EXPORT_VAR		__declspec(dllimport)
-		#define MODULE_DEF				__declspec(dllexport)
-	#endif
-#else
-	#ifdef __cplusplus
-		#define MODULE_EXPORT_FUNC		extern "C" __declspec(dllexport)
-		#define MODULE_EXPORT_VAR		extern "C" __declspec(dllexport)
-		#define MODULE_DEF				extern "C"
-	#else
-		#define MODULE_EXPORT_FUNC		__declspec(dllexport)
-		#define MODULE_EXPORT_VAR		__declspec(dllexport)
-		#define MODULE_DEF
-	#endif
-#endif
-
-#ifdef _MSC_VER
-	#ifndef __cplusplus
-		#define inline __inline
-	#endif
-#endif
-
-#define			UNREF_ARG(x)			(x)
-
-#define			CONVBUFSIZE				65536
-
-// î‘ëgèÓïÒç\ë¢ëÃ
-typedef struct {
-	int		recyear;
-	int		recmonth;
-	int		recday;
-	int		rechour;
-	int		recmin;
-	int		recsec;
-	int		durhour;
-	int		durmin;
-	int		dursec;
-	int		rectimezone;
-	int		makerid;
-	int		modelcode;
-	int		recsrc;
-	int		chnum;
-	WCHAR	chname[CONVBUFSIZE];
-	int		chnamelen;
-	WCHAR	pname[CONVBUFSIZE];
-	int		pnamelen;
-	WCHAR	pdetail[CONVBUFSIZE];
-	int		pdetaillen;
-	WCHAR	pextend[CONVBUFSIZE];
-	int		pextendlen;
-	int		genre[3];
-	int		genretype[3];
-	BOOL	bSonyRpls;
-	BOOL	bPanaRpls;
-
-	/* í«â¡ */
-	BOOL	isok;
-} ProgInfo;
-
 typedef void (*register_hooks_t)();
 
 typedef const WCHAR* (*cmd_handler_t)(const WCHAR*);
 
 typedef enum {
 	TSDUMP_MODULE_NONE = 0,
-	TSDUMP_MODULE_V1 = 1,
-	TSDUMP_MODULE_V2 = 2,
+/*	TSDUMP_MODULE_V1 = 1,
+	TSDUMP_MODULE_V2 = 2,*/
+	TSDUMP_MODULE_V3 = 3,
 } module_ver;
 
 typedef struct{
@@ -92,20 +26,19 @@ typedef struct{
 typedef struct{
 	int sp_num;
 	int ch_num;
-	int service_id;
 	int n_services;
-	int *services;
+	unsigned int *services;
 	int mode_all_services;
 	const WCHAR *tuner_name;
 	const WCHAR *sp_str;
 	const WCHAR *ch_str;
 } ch_info_t;
 
-typedef void* (*hook_pgoutput_create_t)(const WCHAR*, const ProgInfo*, const ch_info_t *ch_info);
+typedef void* (*hook_pgoutput_create_t)(const WCHAR*, const proginfo_t*, const ch_info_t *ch_info);
 typedef void(*hook_pgoutput_t)(void*, const unsigned char*, const size_t);
 typedef const int(*hook_pgoutput_check_t)(void*);
 typedef const int(*hook_pgoutput_wait_t)(void*);
-typedef void(*hook_pgoutput_close_t)(void*, const ProgInfo*);
+typedef void(*hook_pgoutput_close_t)(void*, const proginfo_t*);
 typedef void(*hook_pgoutput_postclose_t)(void*);
 typedef int (*hook_postconfig_t)();
 typedef void(*hook_close_module_t)();
@@ -151,16 +84,15 @@ typedef enum {
 	MSG_SYSERROR = 3,
 	MSG_WINSOCKERROR = 4,
 	MSG_NOTIFY = 5,
-	MSG_DISP = 6
+	MSG_DISP = 6,
+	MSG_PACKETERROR = 7,
+	MSG_DEBUG = 8,
 } message_type_t;
 
 typedef void(*hook_message_t)(const WCHAR*, message_type_t, DWORD*, const WCHAR*);
-typedef const WCHAR *(*hook_path_resolver_t)(const ProgInfo*, const ch_info_t*);
+typedef const WCHAR *(*hook_path_resolver_t)(const proginfo_t*, const ch_info_t*);
 
 //typedef void(*hook_stream_splitter)();
-
-//MODULE_EXPORT_FUNC void print_err(WCHAR* name, int err);
-MODULE_EXPORT_FUNC int putGenreStr(WCHAR*, const int, const int*, const int*);
 
 #define output_message(type, fmt, ...) _output_message( __FILE__ , type, fmt, __VA_ARGS__)
 MODULE_EXPORT_FUNC void _output_message(const char *fname, message_type_t msgtype, const WCHAR *fmt, ...);
@@ -174,7 +106,7 @@ MODULE_EXPORT_FUNC void register_hook_pgoutput_postclose(hook_pgoutput_postclose
 MODULE_EXPORT_FUNC void register_hook_postconfig(hook_postconfig_t handler);
 MODULE_EXPORT_FUNC void register_hook_close_module(hook_close_module_t handler);
 MODULE_EXPORT_FUNC void register_hook_open_stream(hook_open_stream_t handler);
-MODULE_EXPORT_FUNC void register_hook_crypted_stream(hook_encrypted_stream_t handler);
+MODULE_EXPORT_FUNC void register_hook_encrypted_stream(hook_encrypted_stream_t handler);
 MODULE_EXPORT_FUNC void register_hook_stream(hook_stream_t handler);
 MODULE_EXPORT_FUNC void register_hook_close_stream(hook_close_stream_t handler);
 MODULE_EXPORT_FUNC int register_hooks_stream_generator(hooks_stream_generator_t *handlers);
