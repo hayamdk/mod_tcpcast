@@ -5,8 +5,14 @@
 #define MAX_MSG_SIZE 188*1024
 #define BUFSIZE 188*6*1024
 
+#ifdef _WIN64
+#pragma comment(lib, "tsdump_x64.lib")
+#pragma comment(lib, "ws2_32.lib")
+#elif _WIN32
 #pragma comment(lib, "tsdump.lib")
 #pragma comment(lib, "ws2_32.lib")
+#endif
+
 
 #include <winsock2.h>
 #include <windows.h>
@@ -300,7 +306,7 @@ static cmd_def_t cmds[] = {
 };
 
 MODULE_DEF module_def_t mod_tcpcast = {
-	TSDUMP_MODULE_V3,
+	TSDUMP_MODULE_V4,
 	L"mod_tcpcast",
 	register_hooks,
 	cmds
