@@ -25,7 +25,11 @@
 #define PCR_BASE_MAX				0x200000000
 #define PCR_BASE_HZ					(90*1000)
 
-#define ARIB_CHAR_SIZE_RATIO 1
+#ifdef TSD_PLATFORM_MSVC
+#define ARIB_CHAR_SIZE_RATIO 1 /* WCHARではサロゲートペアを除き1文字を1WCHARで表せるので1倍あれば十分 */
+#else
+#define ARIB_CHAR_SIZE_RATIO 2 /* UTF-8ではひとまず2倍を確保（一般的なひらがな・漢字は1.5倍） */
+#endif
 
 typedef enum {
 	PAYLOAD_STAT_INIT = 0,
@@ -50,7 +54,7 @@ typedef struct {
 	int aribstr_len;
 	uint8_t aribstr[256];
 	int str_len;
-	WCHAR str[256*ARIB_CHAR_SIZE_RATIO];
+	TSDCHAR str[256*ARIB_CHAR_SIZE_RATIO];
 } Sed_string_t;
 
 typedef Sed_string_t Sd_string_t;
@@ -59,25 +63,25 @@ typedef struct {
 	int aribdesc_len;
 	uint8_t aribdesc[20]; /* ARIB TR-B14において上限が16bytesと定められている */
 	int desc_len;
-	WCHAR desc[20*ARIB_CHAR_SIZE_RATIO+1];
+	TSDCHAR desc[20*ARIB_CHAR_SIZE_RATIO+1];
 	int aribitem_len;
 	uint8_t aribitem[480]; /* ARIB TR-B14において上限が440bytesと定められている */
 	int item_len;
-	WCHAR item[480*ARIB_CHAR_SIZE_RATIO+1];
+	TSDCHAR item[480*ARIB_CHAR_SIZE_RATIO+1];
 } Eed_item_string_t;
 
 typedef struct {
 	int aribstr_len;
 	uint8_t aribstr[20]; /* ARIB TR-B14において上限が16bytesと定められている */
 	int str_len;
-	WCHAR str[20*ARIB_CHAR_SIZE_RATIO+1];
+	TSDCHAR str[20*ARIB_CHAR_SIZE_RATIO+1];
 } Eed_desc_t;
 
 typedef struct {
 	int aribstr_len;
 	uint8_t aribstr[480]; /* ARIB TR-B14において上限が440bytesと定められている */
 	int str_len;
-	WCHAR str[480*ARIB_CHAR_SIZE_RATIO+1];
+	TSDCHAR str[480*ARIB_CHAR_SIZE_RATIO+1];
 } Eed_text_t;
 
 typedef struct {
@@ -128,8 +132,8 @@ typedef struct {
 	int status;
 
 	/***** PAT,PMT *****/
-	PSI_parse_t PMT_payload;
-	uint32_t PMT_last_CRC;
+	//PSI_parse_t PMT_payload;
+	//uint32_t PMT_last_CRC;
 	int n_service_pids;
 	PMT_pid_def_t service_pids[MAX_PIDS_PER_SERVICE];
 	unsigned int service_id : 16;
@@ -176,10 +180,10 @@ typedef struct {
 
 } proginfo_t;
 
-MODULE_EXPORT_FUNC int get_extended_text(WCHAR *dst, size_t n, const proginfo_t *pi);
-MODULE_EXPORT_FUNC void get_genre_str(const WCHAR **genre1, const WCHAR **genre2, Cd_t_item item);
-MODULE_EXPORT_FUNC int proginfo_cmp(const proginfo_t *pi1, const proginfo_t *pi2);
-MODULE_EXPORT_FUNC int get_stream_timestamp(const proginfo_t *pi, time_mjd_t *jst_time);
-MODULE_EXPORT_FUNC int get_stream_timestamp_rough(const proginfo_t *pi, time_mjd_t *time_mjd);
-MODULE_EXPORT_FUNC int get_time_offset(time_offset_t *offset, const time_mjd_t *time_target, const time_mjd_t *time_orig);
-MODULE_EXPORT_FUNC void time_add_offset(time_mjd_t *dst, const time_mjd_t *orig, const time_offset_t *offset);
+int get_extended_text(TSDCHAR *dst, size_t n, const proginfo_t *pi);
+void get_genre_str(const TSDCHAR **genre1, const TSDCHAR **genre2, Cd_t_item item);
+int proginfo_cmp(const proginfo_t *pi1, const proginfo_t *pi2);
+int get_stream_timestamp(const proginfo_t *pi, time_mjd_t *jst_time);
+int get_stream_timestamp_rough(const proginfo_t *pi, time_mjd_t *time_mjd);
+int get_time_offset(time_offset_t *offset, const time_mjd_t *time_target, const time_mjd_t *time_orig);
+void time_add_offset(time_mjd_t *dst, const time_mjd_t *orig, const time_offset_t *offset);

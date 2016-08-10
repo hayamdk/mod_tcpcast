@@ -5,14 +5,11 @@
 #define MAX_MSG_SIZE 188*1024
 #define BUFSIZE 188*6*1024
 
-#ifdef _WIN64
-#pragma comment(lib, "tsdump_x64.lib")
-#pragma comment(lib, "ws2_32.lib")
-#elif _WIN32
-#pragma comment(lib, "tsdump.lib")
-#pragma comment(lib, "ws2_32.lib")
-#endif
+#define IS_SHARED_MODULE
 
+#include "core/tsdump_def.h"
+
+#pragma comment(lib, "ws2_32.lib")
 
 #include <winsock2.h>
 #include <windows.h>
@@ -21,10 +18,8 @@
 #include <time.h>
 #include <inttypes.h>
 
-#define IN_SHARED_MODULE
-#include "module_def.h"
-#include "ts_proginfo.h"
-#include "module_hooks.h"
+#include "utils/arib_proginfo.h"
+#include "core/module_hooks.h"
 
 typedef struct{
 	struct in_addr addr;
@@ -305,9 +300,9 @@ static cmd_def_t cmds[] = {
 	NULL,
 };
 
-MODULE_DEF module_def_t mod_tcpcast = {
-	TSDUMP_MODULE_V4,
-	L"mod_tcpcast",
+TSD_MODULE_DEF(
+	mod_tcpcast,
 	register_hooks,
-	cmds
-};
+	cmds,
+	NULL
+);
