@@ -9,17 +9,46 @@
 
 #include "core/tsdump_def.h"
 
-#pragma comment(lib, "ws2_32.lib")
+#include <inttypes.h>
 
+#ifdef TSD_PLATFORM_MSVC
+
+#pragma comment(lib, "ws2_32.lib")
 #include <winsock2.h>
 #include <windows.h>
+
+#else
+
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <errno.h>
+#include <sys/ioctl.h>
+
+typedef uint16_t USHORT;
+typedef int SOCKET;
+
+static void WSACleanup()
+{
+	/*do nothing*/
+}
+
+#endif
+
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 #include <sys/timeb.h>
 #include <time.h>
-#include <inttypes.h>
 
 #include "utils/arib_proginfo.h"
 #include "core/module_hooks.h"
+
+#ifdef TSD_PLATFORM_MSVC
+#define MSG_WINSOCKERROR MSG_SYSERROR
+#endif
 
 typedef struct{
 	struct in_addr addr;
@@ -29,9 +58,12 @@ typedef struct{
 	int alive;
 } client_t;
 
+#ifdef TSD_PLATFORM_MSVC
+static WSADATA wsad;
+#endif
+
 static int port = -1;
 static int server_started = 0;
-static WSADATA wsad;
 static SOCKET sock;
 
 static volatile int n_clients = 0;
@@ -42,12 +74,18 @@ int global_buf_pos = 0;
 static int add_client(SOCKET sock, struct in_addr addr, USHORT port)
 {
 	if (n_clients >= MAX_CLIENTS) {
-		//fprintf(stderr, "mod_tcpcast: クライアント数が上限に達しているため接続できません(%s:%d)\n", inet_ntoa(addr), ntohs(port));
+#ifdef TSD_PLATFORM_MSVC
 		output_message(MSG_ERROR, L"クライアント数が上限に達しているため接続できません(%S:%d)", inet_ntoa(addr), ntohs(port));
+#else
+		output_message(MSG_ERROR, "クライアント数が上限に達しているため接続できません(%s:%d)", inet_ntoa(addr), ntohs(port));
+#endif
 		return 0;
 	}
-	//fprintf(stdout, "mod_tcpcast: クライアント(%s:%d)が接続されました\n", inet_ntoa(addr), ntohs(port));
+#ifdef TSD_PLATFORM_MSVC
 	output_message(MSG_NOTIFY, L"mod_tcpcast: クライアント(%S:%d)が接続されました\n", inet_ntoa(addr), ntohs(port));
+#else
+	output_message(MSG_NOTIFY, "mod_tcpcast: クライアント(%s:%d)が接続されました\n", inet_ntoa(addr), ntohs(port));
+#endif
 	clients[n_clients].sock = sock;
 	clients[n_clients].addr = addr;
 	clients[n_clients].port = port;
@@ -57,10 +95,20 @@ static int add_client(SOCKET sock, struct in_addr addr, USHORT port)
 	return 1;
 }
 
+static void shutdown_close_socket(SOCKET sock)
+{
+#ifdef TSD_PLATFORM_MSVC
+	shutdown(sock, SD_BOTH);
+	closesocket(sock);
+#else
+	shutdown(sock, SHUT_RDWR);
+	close(sock);
+#endif
+}
+
 static void remove_client(int client_id)
 {
-	shutdown(clients[client_id].sock, SD_BOTH);
-	closesocket(clients[client_id].sock);
+	shutdown_close_socket(clients[client_id].sock);
 	if (n_clients > 1) {
 		clients[client_id] = clients[n_clients - 1];
 	}
@@ -73,10 +121,13 @@ static void remove_dead_clients()
 	for (i = 0; i < n_clients; ) { /* n_clients に volatile が要りそう？ */
 		if ( ! clients[i].alive ) {
 			remove_client(i);
-			//fprintf(stderr, "mod_tcpcast: クライアント(%s:%d)を切断しました\n",
-			//	inet_ntoa(clients[i].addr), ntohs(clients[i].port));
+#ifdef TSD_PLATFORM_MSVC
 			output_message(MSG_NOTIFY, L"mod_tcpcast: クライアント(%S:%d)を切断しました\n",
 				inet_ntoa(clients[i].addr), ntohs(clients[i].port));
+#else
+			output_message(MSG_NOTIFY, "mod_tcpcast: クライアント(%s:%d)を切断しました\n",
+				inet_ntoa(clients[i].addr), ntohs(clients[i].port));
+#endif
 		} else {
 			i++;
 		}
@@ -105,8 +156,7 @@ static void close_all_clients()
 {
 	int i;
 	for (i = 0; i < n_clients; i++) {
-		shutdown(clients[i].sock, SD_BOTH);
-		closesocket(clients[i].sock);
+		shutdown_close_socket(clients[i].sock);
 	}
 }
 
@@ -144,10 +194,14 @@ static void send_to_all(const unsigned char *buf, size_t size)
 
 		/* クライアントからrecvしたらcloseの合図 */
 		ret = recv(clients[i].sock, &recvchar, 1, 0);
+#ifdef TSD_PLATFORM_MSVC
 		if (ret == SOCKET_ERROR) {
 			if (WSAGetLastError() != WSAEWOULDBLOCK) {
-				//print_err(L"recv()", WSAGetLastError());
-				output_message(MSG_WINSOCKERROR, L"recv()に失敗しました");
+#else
+		if (ret < 0) {
+			if (errno != EAGAIN && errno != EWOULDBLOCK) {
+#endif
+				output_message(MSG_WINSOCKERROR, TSD_TEXT("recv()に失敗しました"));
 				clients[i].alive = 0;
 			}
 		} else if(ret > 0) {
@@ -167,12 +221,16 @@ static void send_to_all(const unsigned char *buf, size_t size)
 
 		/* send */
 		ret = send(clients[i].sock, (const char*)&global_buf[clients[i].buf_pos], sendsize, 0);
+#ifdef TSD_PLATFORM_MSVC
 		if (ret == SOCKET_ERROR) {
 			if (WSAGetLastError() == WSAEWOULDBLOCK) {
+#else
+		if (ret < 0) {
+			if (errno == EAGAIN || errno == EWOULDBLOCK) {
+#endif
 				//printf("mod_tcpcast: PASS!\n");
 			} else {
-				//print_err(L"send()", WSAGetLastError());
-				output_message(MSG_WINSOCKERROR, L"send()に失敗しました");
+				output_message(MSG_WINSOCKERROR, TSD_TEXT("send()に失敗しました"));
 				clients[i].alive = 0;
 				break;
 			}
@@ -190,47 +248,64 @@ static void hook_open_stream()
 		return;
 	}
 
+#ifdef TSD_PLATFORM_MSVC
 	if (WSAStartup(MAKEWORD(2, 0), &wsad) != 0) {
-		//print_err(L"WSAStartup()に失敗", WSAGetLastError());
-		output_message(MSG_WINSOCKERROR, L"WSAStartup()に失敗");
+		output_message(MSG_WINSOCKERROR, TSD_TEXT("WSAStartup()に失敗"));
 		return;
 	}
+#endif
+
 	sock = socket(AF_INET, SOCK_STREAM, 0);
+#ifdef TSD_PLATFORM_MSVC
 	if (sock == INVALID_SOCKET){
-		//print_err(L"socketの作成に失敗", WSAGetLastError());
-		output_message(MSG_WINSOCKERROR, L"socketの作成に失敗");
+#else
+	if (sock < 0) {
+#endif
+		output_message(MSG_WINSOCKERROR, TSD_TEXT("socketの作成に失敗"));
 		WSACleanup();
 		return;
 	}
 
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(port);
+#ifdef TSD_PLATFORM_MSVC
 	addr.sin_addr.S_un.S_addr = INADDR_ANY;
+#else
+	addr.sin_addr.s_addr = INADDR_ANY;
+#endif
 
+#ifdef TSD_PLATFORM_MSVC
 	if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) == SOCKET_ERROR){
-		//print_err(L"bind()に失敗", WSAGetLastError());
-		output_message(MSG_WINSOCKERROR, L"bind()に失敗");
-		shutdown(sock, SD_BOTH);
-		closesocket(sock);
+#else
+	if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+#endif
+		output_message(MSG_WINSOCKERROR, TSD_TEXT("bind()に失敗"));
+		shutdown_close_socket(sock);
 		WSACleanup();
 		return;
 	}
 
+#ifdef TSD_PLATFORM_MSVC
 	if (listen(sock, 5) == SOCKET_ERROR){
-		//print_err(L"listen()に失敗", WSAGetLastError());
-		output_message(MSG_WINSOCKERROR, L"listen()に失敗");
-		shutdown(sock, SD_BOTH);
-		closesocket(sock);
+#else
+	if (listen(sock, 5) < 0) {
+#endif
+		output_message(MSG_WINSOCKERROR, TSD_TEXT("listen()に失敗"));
+		shutdown_close_socket(sock);
 		WSACleanup();
 		return;
 	}
 
+#ifdef TSD_PLATFORM_MSVC
 	u_long val = 1;
 	if (ioctlsocket(sock, FIONBIO, &val) != NO_ERROR) {
-		//print_err(L"ソケットをノンブロッキングモードに設定できません", WSAGetLastError());
-		output_message(MSG_WINSOCKERROR, L"ソケットをノンブロッキングモードに設定できません(ioctlsocket)");
-		shutdown(sock, SD_BOTH);
-		closesocket(sock);
+		output_message(MSG_WINSOCKERROR, TSD_TEXT("ソケットをノンブロッキングモードに設定できません(ioctlsocket)"));
+#else
+	int val = 1;
+	if (ioctl(sock, FIONBIO, &val) < 0) {
+		output_message(MSG_WINSOCKERROR, TSD_TEXT("ソケットをノンブロッキングモードに設定できません(ioctl)"));
+#endif
+		shutdown_close_socket(sock);
 		WSACleanup();
 		return;
 	}
@@ -241,7 +316,11 @@ static void hook_open_stream()
 static void hook_stream(const unsigned char* buf, const size_t size, const int encrypted)
 {
 	struct sockaddr_in client_addr;
+#ifdef TSD_PLATFORM_MSVC
 	int client_addr_len = sizeof(client_addr);
+#else
+	socklen_t client_addr_len = sizeof(client_addr);
+#endif
 	SOCKET sock_client;
 
 	if (!server_started) {
@@ -251,15 +330,23 @@ static void hook_stream(const unsigned char* buf, const size_t size, const int e
 	/* 新しい接続があればaccept */
 	while(1) {
 		sock_client = accept(sock, (struct sockaddr *)&client_addr, &client_addr_len);
+#ifdef TSD_PLATFORM_MSVC
 		if (sock_client == INVALID_SOCKET) {
 			if (WSAGetLastError() != WSAEWOULDBLOCK) {
-				//print_err(L"accept()に失敗", WSAGetLastError());
-				output_message(MSG_WINSOCKERROR, L"accept()に失敗");
+#else
+		if (sock_client < 0) {
+			if (errno != EAGAIN && errno != EWOULDBLOCK) {
+#endif
+				output_message(MSG_WINSOCKERROR, TSD_TEXT("accept()に失敗"));
 			}
 			break;
 		}
 		if (!add_client(sock_client, client_addr.sin_addr, client_addr.sin_port)) {
+#ifdef TSD_PLATFORM_MSVC
 			closesocket(sock_client);
+#else
+			close(sock_client);
+#endif
 		}
 	}
 
@@ -273,8 +360,7 @@ static void hook_close_stream()
 {
 	if (server_started) {
 		close_all_clients();
-		shutdown(sock, SD_BOTH);
-		closesocket(sock);
+		shutdown_close_socket(sock);
 		WSACleanup();
 	}
 }
@@ -286,18 +372,22 @@ static void register_hooks()
 	register_hook_close_stream(hook_close_stream);
 }
 
-static const WCHAR *set_port(const WCHAR *param)
+static const TSDCHAR *set_port(const TSDCHAR *param)
 {
+#ifdef TSD_PLATFORM_MSVC
 	port = _wtoi(param);
+#else
+	port = atoi(param);
+#endif
 	if (port <= 0 || port >= 65536) {
-		return L"指定されたTCPポート番号が不正です";
+		return TSD_TEXT("指定されたTCPポート番号が不正です");
 	}
 	return NULL;
 }
 
 static cmd_def_t cmds[] = {
-	{ L"--tcpport", L"TCPのポート番号", 1, set_port },
-	NULL,
+	{ TSD_TEXT("--tcpport"), TSD_TEXT("TCPのポート番号"), 1, set_port },
+	{ NULL },
 };
 
 TSD_MODULE_DEF(
