@@ -82,9 +82,9 @@ static int add_client(SOCKET sock, struct in_addr addr, USHORT port)
 		return 0;
 	}
 #ifdef TSD_PLATFORM_MSVC
-	output_message(MSG_NOTIFY, L"mod_tcpcast: クライアント(%S:%d)が接続されました\n", inet_ntoa(addr), ntohs(port));
+	output_message(MSG_NOTIFY, L"mod_tcpcast: クライアント(%S:%d)が接続されました", inet_ntoa(addr), ntohs(port));
 #else
-	output_message(MSG_NOTIFY, "mod_tcpcast: クライアント(%s:%d)が接続されました\n", inet_ntoa(addr), ntohs(port));
+	output_message(MSG_NOTIFY, "mod_tcpcast: クライアント(%s:%d)が接続されました", inet_ntoa(addr), ntohs(port));
 #endif
 	clients[n_clients].sock = sock;
 	clients[n_clients].addr = addr;
@@ -122,10 +122,10 @@ static void remove_dead_clients()
 		if ( ! clients[i].alive ) {
 			remove_client(i);
 #ifdef TSD_PLATFORM_MSVC
-			output_message(MSG_NOTIFY, L"mod_tcpcast: クライアント(%S:%d)を切断しました\n",
+			output_message(MSG_NOTIFY, L"mod_tcpcast: クライアント(%S:%d)を切断しました",
 				inet_ntoa(clients[i].addr), ntohs(clients[i].port));
 #else
-			output_message(MSG_NOTIFY, "mod_tcpcast: クライアント(%s:%d)を切断しました\n",
+			output_message(MSG_NOTIFY, "mod_tcpcast: クライアント(%s:%d)を切断しました",
 				inet_ntoa(clients[i].addr), ntohs(clients[i].port));
 #endif
 		} else {
