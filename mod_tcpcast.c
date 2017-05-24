@@ -3,7 +3,7 @@
 
 #define MAX_CLIENTS 32
 #define MAX_MSG_SIZE 188*1024
-#define BUFSIZE 188*6*1024
+#define BUFSIZE 188*6*8192
 
 #define IS_SHARED_MODULE
 
@@ -184,8 +184,8 @@ static void send_to_all(const unsigned char *buf, size_t size)
 			}
 		}
 		memmove(global_buf, &global_buf[diff], global_buf_pos - diff);
+		//output_message(MSG_WARNING, TSD_TEXT("Drop: %d (%d +%d)"), diff, global_buf_pos, size);
 		global_buf_pos -= diff;
-		//printf("mod_tcpcast: DROP! (bytes=%d)\n", diff);
 	}
 	memcpy(&global_buf[global_buf_pos], buf, size);
 	global_buf_pos += size;
