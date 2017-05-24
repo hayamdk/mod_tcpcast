@@ -44,7 +44,7 @@ static void WSACleanup()
 #include <time.h>
 
 #include "utils/arib_proginfo.h"
-#include "core/module_hooks.h"
+#include "core/module_api.h"
 
 #ifdef TSD_PLATFORM_MSVC
 #define MSG_WINSOCKERROR MSG_SYSERROR

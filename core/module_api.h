@@ -5,7 +5,7 @@ typedef void (*register_hooks_t)();
 
 typedef const TSDCHAR* (*cmd_handler_t)(const TSDCHAR*);
 
-#define TSDUMP_MODULE_API_VER 5
+#define TSDUMP_MODULE_API_VER 6
 
 typedef enum {
 	TSDUMP_SCALE_NONE,
@@ -41,15 +41,17 @@ typedef struct{
 	const TSDCHAR *ch_str;
 } ch_info_t;
 
-typedef void* (*hook_pgoutput_create_t)(const TSDCHAR*, const proginfo_t*, const ch_info_t*, const int);
-typedef void (*hook_pgoutput_t)(void*, const unsigned char*, const size_t);
+typedef void* (*hook_pgoutput_precreate_t)(const TSDCHAR*, const proginfo_t*, const ch_info_t*, const int, int*);
+typedef void(*hook_pgoutput_changed_t)(void*, const proginfo_t*, const proginfo_t*);
+typedef void(*hook_pgoutput_end_t)(void*, const proginfo_t*);
+typedef void(*hook_pgoutput_postclose_t)(void*, const proginfo_t*);
+typedef void* (*hook_pgoutput_create_t)(void*, const TSDCHAR*, const proginfo_t*, const ch_info_t*, const int);
+typedef int (*hook_pgoutput_t)(void*, const unsigned char*, const size_t);
 typedef const int (*hook_pgoutput_check_t)(void*);
-typedef const int (*hook_pgoutput_wait_t)(void*);
-typedef void (*hook_pgoutput_changed_t)(void*, const proginfo_t*, const proginfo_t*);
-typedef void (*hook_pgoutput_end_t)(void*, const proginfo_t*);
 typedef void (*hook_pgoutput_close_t)(void*, const proginfo_t*);
-typedef void (*hook_pgoutput_postclose_t)(void*);
+typedef int (*hook_pgoutput_forceclose_t)(void*, int, int);
 typedef int (*hook_postconfig_t)();
+typedef void (*hook_preclose_module_t)();
 typedef void (*hook_close_module_t)();
 typedef void (*hook_open_stream_t)();
 typedef void (*hook_encrypted_stream_t)(const unsigned char*, const size_t);
@@ -127,8 +129,8 @@ typedef enum {
 	typedef int tsd_syserr_t;
 #endif
 
-typedef void(*hook_message_t)(const TSDCHAR*, message_type_t, tsd_syserr_t*, const TSDCHAR*);
-typedef const TSDCHAR *(*hook_path_resolver_t)(const proginfo_t*, const ch_info_t*);
+typedef void (*hook_message_t)(const TSDCHAR*, message_type_t, tsd_syserr_t*, const TSDCHAR*);
+typedef void (*hook_path_resolver_t)(const proginfo_t*, const ch_info_t*, TSDCHAR*);
 
 //typedef void(*hook_stream_splitter)();
 
@@ -137,7 +139,7 @@ typedef const TSDCHAR *(*hook_path_resolver_t)(const proginfo_t*, const ch_info_
 #define TSD_API_DEF(type, name, args) type (* name) args
 #define __TSD_MODULES_HOOKS2
 typedef struct {
-#include "core/module_hooks.h"
+#include "core/module_api.h"
 } tsd_api_set_t;
 #undef __TSD_MODULES_HOOKS2
 
@@ -186,15 +188,18 @@ TSD_API_DEF(void, _output_message, (const char *fname, message_type_t msgtype, c
 TSD_API_DEF(void, get_stream_stats, (const stream_stats_t **s));
 TSD_API_DEF(void, request_shutdown, (int));
 
-TSD_API_DEF(void, register_hook_pgoutput_create, (hook_pgoutput_create_t));
-TSD_API_DEF(void, register_hook_pgoutput, (hook_pgoutput_t));
-TSD_API_DEF(void, register_hook_pgoutput_check, (hook_pgoutput_check_t));
-TSD_API_DEF(void, register_hook_pgoutput_wait, (hook_pgoutput_wait_t));
+TSD_API_DEF(void, register_hook_pgoutput_precreate, (hook_pgoutput_precreate_t));
 TSD_API_DEF(void, register_hook_pgoutput_changed, (hook_pgoutput_changed_t));
 TSD_API_DEF(void, register_hook_pgoutput_end, (hook_pgoutput_end_t));
-TSD_API_DEF(void, register_hook_pgoutput_close, (hook_pgoutput_close_t));
 TSD_API_DEF(void, register_hook_pgoutput_postclose, (hook_pgoutput_postclose_t));
+TSD_API_DEF(void, register_hook_pgoutput_create, (hook_pgoutput_create_t));
+TSD_API_DEF(void, register_hook_pgoutput, (hook_pgoutput_t, int));
+TSD_API_DEF(void, set_use_retval_pgoutput, ());
+TSD_API_DEF(void, register_hook_pgoutput_check, (hook_pgoutput_check_t));
+TSD_API_DEF(void, register_hook_pgoutput_close, (hook_pgoutput_close_t));
+TSD_API_DEF(void, register_hook_pgoutput_forceclose, (hook_pgoutput_forceclose_t));
 TSD_API_DEF(void, register_hook_postconfig, (hook_postconfig_t));
+TSD_API_DEF(void, register_hook_preclose_module, (hook_preclose_module_t));
 TSD_API_DEF(void, register_hook_close_module, (hook_close_module_t));
 TSD_API_DEF(void, register_hook_open_stream, (hook_open_stream_t));
 TSD_API_DEF(void, register_hook_encrypted_stream, (hook_encrypted_stream_t));
@@ -219,7 +224,7 @@ TSD_API_DEF(void, register_hook_tick, (hook_tick_t));
 static void __tsd_api_init(void *p)
 {
 	tsd_api_set_t *set = (tsd_api_set_t*)p;
-#include "core/module_hooks.h"
+#include "core/module_api.h"
 }
 
 #endif
@@ -234,7 +239,7 @@ static void __tsd_api_init(void *p)
 static void tsd_api_init_set(void *p)
 {
 	tsd_api_set_t *set =(tsd_api_set_t*)p;
-#include "core/module_hooks.h"
+#include "core/module_api.h"
 }
 #endif
 

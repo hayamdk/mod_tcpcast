@@ -78,13 +78,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="module_def.h" />
+    <ClInclude Include="module_api.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="module_hooks.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="ts_proginfo.h" />
+    <ClInclude Include="arib_proginfo.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="mod_tcpcast.c" />
