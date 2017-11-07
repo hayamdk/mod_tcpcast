@@ -4,6 +4,7 @@
 #define MAX_CLIENTS 32
 #define MAX_MSG_SIZE 188*1024
 #define BUFSIZE 188*6*8192
+#define CLEARSIZE 188*2*8192
 
 #define IS_SHARED_MODULE
 
@@ -177,6 +178,10 @@ static void send_to_all(const unsigned char *buf, size_t size)
 	/* バッファが足りなければ古いデータを捨てる */
 	diff = global_buf_pos + size - BUFSIZE;
 	if (diff > 0) {
+		/* 最低でも一度に CLEARSIZE バイト捨てる */
+		if (size < CLEARSIZE) {
+			diff = global_buf_pos + CLEARSIZE - BUFSIZE;
+		}
 		for (i = 0; i < n_clients; i++) {
 			clients[i].buf_pos -= diff;
 			if (clients[i].buf_pos < 0) {
